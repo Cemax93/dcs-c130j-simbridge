@@ -28,14 +28,16 @@ py -3 main.py
 
 ## Workflow
 
-1. Enter a SimBrief username or Pilot ID and fetch the latest plan.
-2. Select a theater and adjust departure/arrival airports or runways if
-   needed.
-3. Review the generated waypoints. Rows can be added, edited, deleted, or
+1. Select a theater, then choose the departure and arrival airports and
+   runways.
+2. Click **Open SimBrief Prefill** to open SimBrief with those airports
+   prefilled.
+3. Enter a SimBrief username or Pilot ID and fetch the generated plan.
+4. Review the generated waypoints. Rows can be added, edited, deleted, or
    reordered.
-4. Use **Export Flight Plan** to create a shareable `.simbridge.json` file,
+5. Use **Export Flight Plan** to create a shareable `.simbridge.json` file,
    or use **Import Flight Plan** to load one received from another operator.
-5. Choose the DCS `user_data.db` file and insert the route.
+6. Choose the DCS `user_data.db` file and insert the route.
 
 The database is updated in place. Make a backup before importing a route.
 

@@ -41,6 +41,7 @@ class SimBridgeApp:
 
         # State variables
         self.simbrief_user = tk.StringVar()
+        self.simbrief_prefill_opened = False
         self.custom_route_name = tk.StringVar()
         self.create_faf_var = tk.BooleanVar(value=True)
         self.click_to_add_var = tk.BooleanVar(value=True)
@@ -95,15 +96,8 @@ class SimBridgeApp:
         top_frame = ttk.LabelFrame(left_pane, text=" DCS C-130J SimBridge Setup ", padding="8")
         top_frame.pack(fill=tk.X, pady=(0, 8))
 
-        row0 = ttk.Frame(top_frame)
-        row0.pack(fill=tk.X, pady=2)
-        ttk.Label(row0, text="SimBrief User:").pack(side=tk.LEFT, padx=(0, 4))
-        ttk.Entry(row0, textvariable=self.simbrief_user, width=16).pack(side=tk.LEFT, padx=(0, 8))
-        self.fetch_btn = ttk.Button(row0, text="Fetch Flight Plan", command=self.start_fetch_thread)
-        self.fetch_btn.pack(side=tk.LEFT)
-
         row1 = ttk.Frame(top_frame)
-        row1.pack(fill=tk.X, pady=4)
+        row1.pack(fill=tk.X, pady=2)
         ttk.Label(row1, text="Theater / Map:").pack(side=tk.LEFT, padx=(0, 4))
         self.theater_cb = ttk.Combobox(
             row1,
@@ -115,15 +109,15 @@ class SimBridgeApp:
         self.theater_cb.pack(side=tk.LEFT, padx=(0, 8))
         self.theater_cb.bind("<<ComboboxSelected>>", self._on_theater_changed)
 
-        ttk.Button(row1, text="SimBrief Dispatch", command=self.open_simbrief_dispatch).pack(side=tk.RIGHT)
-
         # Overrides row
         row2 = ttk.Frame(top_frame)
         row2.pack(fill=tk.X, pady=2)
         ttk.Label(row2, text="Departure:").pack(side=tk.LEFT, padx=(0, 4))
         self.dep_cb = ttk.Combobox(row2, textvariable=self.dep_override_var, state="readonly", width=18)
         self.dep_cb.pack(side=tk.LEFT, padx=(0, 4))
-        self.dep_cb.bind("<<ComboboxSelected>>", lambda _: self._update_runways(self.dep_override_var, self.dep_rwy_cb))
+        self.dep_cb.bind("<<ComboboxSelected>>", lambda _: self._on_airport_selected(
+            self.dep_override_var, self.dep_rwy_cb
+        ))
 
         ttk.Label(row2, text="Rwy:").pack(side=tk.LEFT, padx=(2, 2))
         self.dep_rwy_cb = ttk.Combobox(row2, textvariable=self.dep_rwy_var, state="readonly", width=5)
@@ -134,11 +128,33 @@ class SimBridgeApp:
         ttk.Label(row3, text="Arrival:").pack(side=tk.LEFT, padx=(0, 20))
         self.arr_cb = ttk.Combobox(row3, textvariable=self.arr_override_var, state="readonly", width=18)
         self.arr_cb.pack(side=tk.LEFT, padx=(0, 4))
-        self.arr_cb.bind("<<ComboboxSelected>>", lambda _: self._update_runways(self.arr_override_var, self.arr_rwy_cb))
+        self.arr_cb.bind("<<ComboboxSelected>>", lambda _: self._on_airport_selected(
+            self.arr_override_var, self.arr_rwy_cb
+        ))
 
         ttk.Label(row3, text="Rwy:").pack(side=tk.LEFT, padx=(2, 2))
         self.arr_rwy_cb = ttk.Combobox(row3, textvariable=self.arr_rwy_var, state="readonly", width=5)
         self.arr_rwy_cb.pack(side=tk.LEFT)
+
+        ttk.Button(
+            top_frame,
+            text="Open SimBrief Prefill",
+            command=self.open_simbrief_dispatch
+        ).pack(anchor="w", pady=(6, 0))
+
+        ttk.Label(
+            top_frame,
+            text="Set departure and arrival before opening SimBrief or fetching a plan.",
+        ).pack(anchor="w", pady=(2, 0))
+
+        row0 = ttk.Frame(top_frame)
+        row0.pack(fill=tk.X, pady=(6, 0))
+        ttk.Label(row0, text="SimBrief User / Pilot ID:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Entry(row0, textvariable=self.simbrief_user, width=16).pack(side=tk.LEFT, padx=(0, 8))
+        self.fetch_btn = ttk.Button(row0, text="Fetch Generated Plan", command=self.start_fetch_thread)
+        self.fetch_btn.pack(side=tk.LEFT)
+        self.fetch_btn.config(state="disabled")
+        self.simbrief_user.trace_add("write", lambda *_: self._update_fetch_state())
 
         ttk.Checkbutton(
             top_frame,
@@ -507,6 +523,7 @@ class SimBridgeApp:
         self.arr_rwy_cb.config(values=[])
 
     def _on_theater_changed(self, _event=None):
+        self.simbrief_prefill_opened = False
         self._update_theater_airports()
         self.center_map_on_theater()
 
@@ -523,6 +540,21 @@ class SimBridgeApp:
                 return
         cb_widget.set("")
         cb_widget.config(values=[])
+
+    def _on_airport_selected(self, airport_var, runway_widget):
+        self.simbrief_prefill_opened = False
+        self._update_runways(airport_var, runway_widget)
+        self._update_fetch_state()
+
+    def _update_fetch_state(self):
+        """Enable SimBrief fetching only after its required inputs are ready."""
+        has_airports = bool(self.dep_override_var.get() and self.arr_override_var.get())
+        has_user = bool(self.simbrief_user.get().strip())
+        has_prefill = self.simbrief_prefill_opened
+        if hasattr(self, "fetch_btn"):
+            self.fetch_btn.config(
+                state="normal" if has_airports and has_user and has_prefill else "disabled"
+            )
 
     def _clean_rwy(self, icao, raw_rwy):
         if not raw_rwy:
@@ -565,15 +597,23 @@ class SimBridgeApp:
     def open_simbrief_dispatch(self):
         dep_sel = self.dep_override_var.get()
         arr_sel = self.arr_override_var.get()
+        if not dep_sel or not arr_sel:
+            messagebox.showwarning(
+                "Airports Required",
+                "Select both departure and arrival airports before opening SimBrief.",
+            )
+            return
+
         airports = self._get_current_theater_airports()
 
         orig_proxy = airports.get(dep_sel.split(" - ")[0], {}).get("proxy", "") if dep_sel else ""
         dest_proxy = airports.get(arr_sel.split(" - ")[0], {}).get("proxy", "") if arr_sel else ""
 
         url = "https://www.simbrief.com/system/dispatch.php"
-        if orig_proxy or dest_proxy:
-            url += f"?orig={orig_proxy}&dest={dest_proxy}"
+        url += f"?orig={orig_proxy}&dest={dest_proxy}"
         webbrowser.open(url)
+        self.simbrief_prefill_opened = True
+        self._update_fetch_state()
 
     # -------------------------------------------------------------------------
     # WAYPOINTS TABLE MANAGEMENT
@@ -795,6 +835,18 @@ class SimBridgeApp:
         username = self.simbrief_user.get().strip()
         if not username:
             messagebox.showwarning("Input Required", "Please enter a SimBrief username or Pilot ID.")
+            return
+        if not self.dep_override_var.get() or not self.arr_override_var.get():
+            messagebox.showwarning(
+                "Airports Required",
+                "Select both departure and arrival airports before fetching a flight plan.",
+            )
+            return
+        if not self.simbrief_prefill_opened:
+            messagebox.showwarning(
+                "SimBrief Prefill Required",
+                "Open SimBrief Prefill before fetching the flight plan.",
+            )
             return
         self.fetch_btn.config(state="disabled")
         threading.Thread(target=self._run_simbrief_fetch, args=(username,), daemon=True).start()
