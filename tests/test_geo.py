@@ -5,6 +5,7 @@ from dcs_c130j_simbridge.geo import (
     dec_to_c130_coord,
     generate_approach_fix,
     parse_coordinate,
+    runway_vector,
 )
 
 
@@ -24,3 +25,9 @@ class CoordinateTests(unittest.TestCase):
 
     def test_approach_fix_requires_a_runway_number(self):
         self.assertIsNone(generate_approach_fix(45, 37, "unknown"))
+
+    def test_runway_vector_starts_at_airport(self):
+        vector = runway_vector(45, 37, "09", length_nm=5)
+        self.assertIsNotNone(vector)
+        self.assertEqual(vector[0], (45, 37))
+        self.assertGreater(vector[1][1], 37)

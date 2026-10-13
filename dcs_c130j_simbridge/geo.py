@@ -77,6 +77,28 @@ def generate_approach_fix(lat, lon, rwy_str, dist_nm=10.0):
     return math.degrees(lat2), math.degrees(lon2)
 
 
+def runway_vector(lat, lon, runway, length_nm=5.0):
+    """Return the runway centerline from an airport for map display."""
+    match = re.search(r"(\d+)", str(runway))
+    if not match:
+        return None
+
+    heading = math.radians((int(match.group(1)) % 36) * 10)
+    earth_radius_nm = 3440.065
+    angular_distance = length_nm / earth_radius_nm
+    lat1 = math.radians(lat)
+    lon1 = math.radians(lon)
+    lat2 = math.asin(
+        math.sin(lat1) * math.cos(angular_distance)
+        + math.cos(lat1) * math.sin(angular_distance) * math.cos(heading)
+    )
+    lon2 = lon1 + math.atan2(
+        math.sin(heading) * math.sin(angular_distance) * math.cos(lat1),
+        math.cos(angular_distance) - math.sin(lat1) * math.sin(lat2),
+    )
+    return [(lat, lon), (math.degrees(lat2), math.degrees(lon2))]
+
+
 def format_c130_waypoint(name, wp_type, lat, lon, rwy="", elev="-999"):
     """Formats a waypoint record string for C-130J CNI routes table."""
     flag_10 = 1 if wp_type in (1, 2) else 0

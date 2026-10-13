@@ -20,6 +20,7 @@ from .geo import (
     dec_to_c130_coord,
     format_c130_waypoint,
     generate_approach_fix,
+    runway_vector,
 )
 
 try:
@@ -122,6 +123,7 @@ class SimBridgeApp:
         ttk.Label(row2, text="Rwy:").pack(side=tk.LEFT, padx=(2, 2))
         self.dep_rwy_cb = ttk.Combobox(row2, textvariable=self.dep_rwy_var, state="readonly", width=5)
         self.dep_rwy_cb.pack(side=tk.LEFT)
+        self.dep_rwy_cb.bind("<<ComboboxSelected>>", lambda _: self.refresh_map_display())
 
         row3 = ttk.Frame(top_frame)
         row3.pack(fill=tk.X, pady=2)
@@ -135,6 +137,7 @@ class SimBridgeApp:
         ttk.Label(row3, text="Rwy:").pack(side=tk.LEFT, padx=(2, 2))
         self.arr_rwy_cb = ttk.Combobox(row3, textvariable=self.arr_rwy_var, state="readonly", width=5)
         self.arr_rwy_cb.pack(side=tk.LEFT)
+        self.arr_rwy_cb.bind("<<ComboboxSelected>>", lambda _: self.refresh_map_display())
 
         ttk.Button(
             top_frame,
@@ -499,6 +502,25 @@ class SimBridgeApp:
 
         if len(coords_path) >= 2:
             self.map_widget.set_path(coords_path, color="#007BFF", width=3)
+
+        self._draw_runway_vectors()
+
+    def _draw_runway_vectors(self):
+        """Draw selected departure and arrival runway centerlines."""
+        airports = self._get_current_theater_airports()
+        runway_specs = (
+            (self.dep_override_var.get(), self.dep_rwy_var.get(), "#28A745"),
+            (self.arr_override_var.get(), self.arr_rwy_var.get(), "#DC3545"),
+        )
+        for airport_selection, runway, color in runway_specs:
+            if not airport_selection or not runway:
+                continue
+            airport = airports.get(airport_selection.split(" - ")[0])
+            if not airport:
+                continue
+            vector = runway_vector(airport["lat"], airport["lon"], runway)
+            if vector:
+                self.map_widget.set_path(vector, color=color, width=4)
 
     # -------------------------------------------------------------------------
     # THEATER & RUNWAY HELPERS
