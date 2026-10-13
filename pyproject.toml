@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dcs-c130j-simbridge"
+version = "1.0.0"
+description = "Bridge SimBrief flight plans into the DCS C-130J-30 module."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+map = ["tkintermapview>=1.29"]
+
+[project.scripts]
+dcs-c130j-simbridge = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["dcs_c130j_simbridge*"]

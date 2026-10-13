@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+theaters.json
+*.db
+*.sqlite
+*.sqlite3
+.idea/
+.vscode/
